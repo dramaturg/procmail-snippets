@@ -1,0 +1,43 @@
+
+#########################################################
+# this section is used for PGP-related procmail rules
+#
+
+# import PGP keys from eMails
+:0 Bc
+* ^-----BEGIN.PGP.PUBLIC.KEY.BLOCK-----
+{
+	LOG = "Imported PGP public Key$NL"
+
+	:0
+	| /usr/bin/gpg --import
+}
+
+# PGP auto key retreival
+:0 Bc
+* ^-----BEGIN PGP
+*!^FROM_DAEMON
+| gpg --no-verbose --batch --output /dev/null --keyserver-options auto-key-retrieve --verify - - 
+
+# convert old-style PGP-messgages
+:0
+* !
+* ! ^Content-Type: (message/|multipart/|application/pgp)
+{
+   # backup
+   :0 c
+   * ^-----BEGIN PGP
+   pgp-backup
+
+   :0 fBwD
+   * ^-----BEGIN PGP MESSAGE-----
+   * ^-----END PGP MESSAGE-----
+   | formail -i "Content-Type: application/pgp; format=text; x-action=encrypt"
+
+   :0 fBwD
+   * ^-----BEGIN PGP SIGNED MESSAGE-----
+   * ^-----BEGIN PGP SIGNATURE-----
+   * ^-----END PGP SIGNATURE-----
+   | formail -i "Content-Type: application/pgp; format=text; x-action=sign"
+}
+
