@@ -1,0 +1,112 @@
+
+
+#########################################################
+# yahoo groups
+#
+
+:0
+* ^X-Apparently-To:..*@yahoogroups.
+{
+   :0
+   * ^X-Apparently-To:.\/[^@]+
+   {
+      # create maildir if needed
+      :0
+      * ! ? test -d $MAILDIR/.Lists.yahoo.$MATCH
+      {
+         :0
+         * ? mkdir -p $MAILDIR/.Lists.yahoo.$MATCH
+         * ? mkdir -p $MAILDIR/.Lists.yahoo.$MATCH/cur
+         * ? mkdir -p $MAILDIR/.Lists.yahoo.$MATCH/tmp
+         * ? mkdir -p $MAILDIR/.Lists.yahoo.$MATCH/new
+         { }
+      }
+
+      :0
+      .Lists.yahoo.$MATCH/
+   }
+}
+
+# Mailing lists filtered by 'List-Id'
+:0
+* ^List-Id:
+{
+  :0
+  * ^List-Id:.*<nfsv4.linux-nfs.org>
+  .Lists.net.nfs-nfsv4/
+
+  :0
+  * ^List-Id:.*<pnfs.linux-nfs.org>
+  .Lists.net.nfs-pnfs/
+}
+
+# Lists identified by 'Sender'
+:0
+* ^Sender:
+{
+  # netbsd
+  :0
+  * ^Sender: ((netbsd|port|tech|regional|current|bulk)-|)[a-z0-9]+-owner@netbsd.org
+  * $ ^Sender: \/((netbsd|port|tech|regional|current|bulk)-|)[a-z0-9]+
+  {
+    :0
+    * $ MATCH ?? ^^netbsd-\/.*
+    { }
+
+    # create maildir if needed
+    :0
+    * ! ? test -d $MAILDIR/.Lists.netbsd.$MATCH/
+    {
+      :0
+      * ? mkdir -p $MAILDIR/.Lists.netbsd.$MATCH/
+      { }
+    }
+
+    :0
+    $MAILDIR/.Lists.netbsd.$MATCH/
+  }
+
+  # postgreSQL lists
+  :0
+  * ^Sender:.pgsql
+  {
+    :0
+    * ^Sender:.pgsql-admin-owner@postgresql.org
+    .Lists.postgresql.admin/
+
+    :0
+    * ^Sender:.pgsql-sql-owner@postgresql.org
+    .Lists.postgresql.sql/
+
+    :0
+    * ^Sender:.pgsql-performance-owner@postgresql.org
+    .Lists.postgresql.performance/
+
+    :0
+    * ^Sender:.pgsql-announce-owner@postgresql.org
+    .Lists.postgresql.announce/
+  }
+
+  # postfix-announce
+  :0
+  * ^Sender..owner-postfix-announce@postfix.org
+  .Lists.mail.postfix-announce/
+
+  # Indymedia mailing lists
+  :0
+  * ^Sender:.*imc-\/.*@lists.indymedia.org
+  * ^X-BeenThere:.imc-\/[^@]*
+  {
+     FOLDER = $MATCH
+  
+     :0
+     * FOLDER ?? .
+     .Lists.indymedia.${FOLDER}/
+  }
+
+}
+
+:0
+* ^X-Mailing-List:.<codalist@coda.cs.cmu.edu>
+.Lists.admin.afs.coda/
+
