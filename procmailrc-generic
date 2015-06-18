@@ -1,0 +1,48 @@
+#
+# Sebs .procmailrc
+#
+
+PROCMAILBASE=$HOME/.procmail
+MAILDIR=$DEFAULT
+
+WS="	 "
+NL="
+"
+
+LOGFILE=$MAILDIR/.procmail.log
+
+#
+#################################################
+# disable mail-delivery temporarily
+
+#EXITCODE = 75 # Means: retry later; requeue
+#HOST     = stopped_by_external_request
+
+
+
+#################################################
+# extract header-from
+:0
+* !
+* $ ^From:[${WS}]\/.*$
+{
+   FROM = "$MATCH"
+
+   # extract address
+   :0
+   * $ FROM ?? \/[^<(${WS}]+@[^>)${WS}]+
+   { FROMADDR = $MATCH }
+}
+
+:0
+* $ ^From:.*\/$addrspec__
+{
+	FROMADDR = $MATCH
+}
+
+# extract message-id
+:0
+* $ ^Message-ID:.*<\/[^>]*
+{ MSGID = "$MATCH" }
+
+

@@ -1,0 +1,191 @@
+
+#########################################################
+# Spam - kill em all!
+#
+
+
+# lots of shouting in the subject
+# (more than 75% caps)
+
+:0
+* !
+* ^Subject:.*\/[a-z].*
+{
+  :0 D
+  *  0.1^0
+  *  1^1 MATCH ?? [A-Z]
+  * -3^1 MATCH ?? [a-z]
+  { MORETHANSEVENTYFIVEPCTCAPS = yes }
+}
+
+
+# an empty body can't be very useful
+:0
+* B ?? ^^[      $NL]*^^
+.Trash/
+
+
+#########################################################
+# check for message id inserted by one of our relays
+
+LOCALSERVER  = "mymail.server.domain"
+BACKUPSERVER = "((relay1|relay2)\.otherdomain|third\.party\.mx\.thirddomain)"
+OURRELAYS    = "(${LOCALSERVER}|${BACKUPSERVER})"
+VIRTUALTABLE = "/etc/postfix/virtual"
+
+:0
+* !
+*   ^Message-Id:.*@
+* $ ^Message-Id:.*@\/[a-z0-9\.]+
+{
+   MSGIDHOST = $MATCH
+   LOG = ":${MSGIDHOST}:"
+   
+   # only proceed if we have a fully qualified host/domain name
+   :0
+   * MSGIDHOST ?? \.
+   {
+      :0
+      * MSGIDHOST ?? ${OURRELAYS}
+      {
+         LOG = ":host matches relay:"
+      }
+   }
+}
+
+
+#########################################################
+# SPF - Sender Permitted From
+
+:0
+* !
+* ! ? /usr/local/bin/spfquery -ip=${IP} -sender=${FROM_}
+{
+   SPFRET = $?
+
+   :0
+   * SPFRET ?? 1
+   {
+      INCLUDERC=$PROCMAILBASE/spam/inc_reportspam
+   
+      :0
+      $SPAMFOLDER/spf/
+   }
+
+   :0
+   * SPFRET ?? 3
+   {
+      INCLUDERC=$PROCMAILBASE/spam/inc_reportspam
+
+      :0
+      $SPAMFOLDER/spf_neutral/
+   }
+
+   # (all other return codes indicate some result which
+   # isn't important to us)
+
+   SPFRET
+}
+
+
+#########################################################
+# check the received-by hop against RBLs
+
+:0
+* !
+* ? echo $IP | grep -sqif $HOME/.procmail/spam/blacklist-ip
+{
+   INCLUDERC=$PROCMAILBASE/spam/inc_reportspam
+
+   :0
+   $SPAMFOLDER/blacklist-ip/
+}
+
+# dynamic ip-ranges
+:0
+* !
+* 1^0 ! ? /home/seb/bin/blq dynablock.njabl.org ${IP}
+* 1^0 ! ? /home/seb/bin/blq dialups.mail-abuse.org ${IP}
+* 1^0 ! ? /home/seb/bin/blq dul.dnsbl.sorbs.net ${IP}
+{
+   INCLUDERC=$PROCMAILBASE/spam/inc_reportspam
+
+   :0
+   $SPAMFOLDER/dialin/
+}
+
+# other blacklists
+:0 W
+* !
+* -1^0
+* 1^0 ! ? /home/seb/bin/blq relays.rbl.dynfx.net ${IP}
+* 1^0 ! ? /home/seb/bin/blq relays.visi.com ${IP}
+* 1^0 ! ? /home/seb/bin/blq relays.mail-abuse.org ${IP}
+* 1^0 ! ? /home/seb/bin/blq relaytest.kundenserver.de ${IP}
+* 1^0 ! ? /home/seb/bin/blq dnsbl.ahbl.org ${IP}
+* 2^0 ! ? /home/seb/bin/blq sbl.spamhaus.org ${IP}
+* 1^0 ! ? /home/seb/bin/blq xbl.spamhaus.org ${IP}
+* 1^0 ! ? /home/seb/bin/blq dsbl-unconfirmed ${IP}
+* 1^0 ! ? /home/seb/bin/blq spamcop ${IP}
+* 1^0 ! ? /home/seb/bin/blq opm     ${IP}
+* 1^0 ! ? /home/seb/bin/blq ordb    ${IP}
+* 1^0 ! ? /home/seb/bin/blq hil     ${IP}
+{
+   INCLUDERC=$PROCMAILBASE/spam/inc_reportspam
+
+   :0
+   $SPAMFOLDER/rbl/
+}
+
+
+#########################################################
+# check the mail with vipuls razor before wasting
+# ressources with spamassassin
+
+:0 Wc
+* !
+| /usr/pkg/bin/razor-check
+
+:0 Wa
+* !
+{
+   INCLUDERC=$PROCMAILBASE/spam/inc_reportspam
+
+   :0
+   $SPAMFOLDER/razor/
+}
+
+
+#########################################################
+# spamassassin
+
+# part 1 - remove existing markup
+:0 f
+* !
+* ^X-Spam-Status
+| /usr/pkg/bin/spamassassin --remove-markup
+
+# part 2 - parse the mail through spamassassin
+:0 fw
+* !
+| /usr/pkg/bin/spamc
+
+# part 3 - kill harcore-spam
+:0
+* !
+* X-Spam-Status:.(YES|NO),.hits=[0-9][0-9]+\.[0-9]
+{
+   INCLUDERC=$PROCMAILBASE/spam/inc_reportspam
+
+   :0
+   $SPAMFOLDER/sa-hardcore/
+}
+
+# part 4 - could be spam
+:0
+* !
+* X-Spam-Level:.\*\*\*\*\*
+{
+   SA_MAYBE=YES
+}
+
